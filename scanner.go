@@ -6,10 +6,12 @@ import (
 	"os"
 
 	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logftext"
 )
 
-func scan(r io.Reader) {
+func scan(r io.Reader, noColor bool) {
 	buf := logf.NewBuffer()
+	eseq := logftext.EscapeSequence{NoColor: noColor}
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -22,7 +24,7 @@ func scan(r io.Reader) {
 		}
 
 		adoptEntry(&e)
-		format(buf, &e)
+		format(buf, eseq, &e)
 
 		os.Stdout.Write(buf.Bytes())
 		buf.Reset()
@@ -49,6 +51,9 @@ type Entry struct {
 
 func parse(data []byte) (Entry, bool) {
 	var t Entry
+	if len(data) < 2 {
+		return t, false
+	}
 
 	idx := 0
 	// TODO: check for curly brackets
@@ -76,7 +81,7 @@ func parse(data []byte) (Entry, bool) {
 					t.Fields = append(t.Fields, Field{v, v1})
 				}
 			}
-		case "ts", "TS":
+		case "ts", "TS", "time", "TIME":
 			t.Time = v1
 		case "_SOURCE_REALTIME_TIMESTAMP":
 			t.RealtimeTimestamp = v1

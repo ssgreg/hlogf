@@ -39,7 +39,12 @@ func encodeTime(ts []byte) (time.Time, bool) {
 		return t, true
 	}
 
-	t, err := time.Parse(time.RFC3339, string(ts))
+	t, err := time.Parse(time.RFC3339Nano, string(ts))
+	if err == nil {
+		return t, true
+	}
+
+	t, err = time.Parse(time.RFC3339, string(ts))
 	if err == nil {
 		return t, true
 	}

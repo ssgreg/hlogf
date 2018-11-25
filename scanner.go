@@ -54,51 +54,51 @@ func parse(data []byte) (Entry, bool) {
 	if len(data) < 2 {
 		return t, false
 	}
-
-	idx := 0
-	// TODO: check for curly brackets
+	if data[0] != '{' || data[len(data)-1] != '}' {
+		return t, false
+	}
 	data = data[1 : len(data)-1]
 
-	for idx < len(data) {
-		v, length, ok := fetchKey(data[idx:])
+	for idx := 0; idx < len(data); {
+		key, length, ok := fetchKey(data[idx:])
 		if !ok {
 			return t, false
 		}
 		idx += length + 1
 
-		v1, length, ok := fetchValue(data[idx:])
+		val, length, ok := fetchValue(data[idx:])
 		if !ok {
 			return t, false
 		}
 		idx += length + 1
 
-		switch string(v) {
+		switch string(key) {
 		case "level", "LEVEL":
 			if len(t.Level) == 0 {
-				t.Level = v1
+				t.Level = val
 			} else {
-				if v[0] != '_' {
-					t.Fields = append(t.Fields, Field{v, v1})
+				if key[0] != '_' {
+					t.Fields = append(t.Fields, Field{key, val})
 				}
 			}
 		case "ts", "TS", "time", "TIME":
-			t.Time = v1
+			t.Time = val
 		case "_SOURCE_REALTIME_TIMESTAMP":
-			t.RealtimeTimestamp = v1
+			t.RealtimeTimestamp = val
 		case "__REALTIME_TIMESTAMP":
-			t.SourceTimestamp = v1
+			t.SourceTimestamp = val
 		case "msg", "MESSAGE":
-			t.Msg = v1
+			t.Msg = val
 		case "logger", "LOGGER":
-			t.Name = v1
+			t.Name = val
 		case "caller", "CALLER":
-			t.Caller = v1
+			t.Caller = val
 		case "PRIORITY":
-			t.Priority = v1
+			t.Priority = val
 		case "SYSLOG_FACILITY", "SYSLOG_IDENTIFIER":
 		default:
-			if v[0] != '_' {
-				t.Fields = append(t.Fields, Field{v, v1})
+			if key[0] != '_' {
+				t.Fields = append(t.Fields, Field{key, val})
 			}
 		}
 	}

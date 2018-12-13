@@ -4,8 +4,6 @@ before:
 
 builds:
   -
-    main: ./main.go
-    binary: hlogf
     goos:
       - windows
       - darwin

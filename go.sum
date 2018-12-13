@@ -1,0 +1,4 @@
+github.com/ssgreg/logf v0.0.0-20181213072521-f26dbd9de77f h1:v5sGYZqxuKxPmc2rUp4Xmy4l/GeuPXA0ge40RWqUrOc=
+github.com/ssgreg/logf v0.0.0-20181213072521-f26dbd9de77f/go.mod h1:DpqE3LrP1a7O0/y5bs1qeJn8k6tXv2ZTNWuAg/sz9PU=
+github.com/ssgreg/logftext v0.0.0-20181120164614-595877050411 h1:6L0R7R+qxxTihmAcuiA1rf9XXf+WL+WldjHKcVtgzcg=
+github.com/ssgreg/logftext v0.0.0-20181120164614-595877050411/go.mod h1:TNf/Vv56/h+wbO6QIqECYvfxhYeXA3wNQK5rtvYLKuI=

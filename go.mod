@@ -3,6 +3,10 @@ module github.com/ssgreg/hlogf
 // go: no requirements found in vendor/vendor.json
 
 require (
-	github.com/ssgreg/logf v0.0.0-20181213072521-f26dbd9de77f
-	github.com/ssgreg/logftext v0.0.0-20181120164614-595877050411
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/ssgreg/logf v1.0.0
+	github.com/ssgreg/logftext v1.0.0
+	github.com/stretchr/testify v1.2.2 // indirect
+	golang.org/x/sys v0.0.0-20181213081344-73d4af5aa059 // indirect
 )

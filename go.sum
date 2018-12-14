@@ -1,4 +1,12 @@
-github.com/ssgreg/logf v0.0.0-20181213072521-f26dbd9de77f h1:v5sGYZqxuKxPmc2rUp4Xmy4l/GeuPXA0ge40RWqUrOc=
-github.com/ssgreg/logf v0.0.0-20181213072521-f26dbd9de77f/go.mod h1:DpqE3LrP1a7O0/y5bs1qeJn8k6tXv2ZTNWuAg/sz9PU=
-github.com/ssgreg/logftext v0.0.0-20181120164614-595877050411 h1:6L0R7R+qxxTihmAcuiA1rf9XXf+WL+WldjHKcVtgzcg=
-github.com/ssgreg/logftext v0.0.0-20181120164614-595877050411/go.mod h1:TNf/Vv56/h+wbO6QIqECYvfxhYeXA3wNQK5rtvYLKuI=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/ssgreg/logf v1.0.0 h1:+bNz2abA7bzBeDwNwgMy3sPMH5/LSZq/IsWWQsxYnHo=
+github.com/ssgreg/logf v1.0.0/go.mod h1:DpqE3LrP1a7O0/y5bs1qeJn8k6tXv2ZTNWuAg/sz9PU=
+github.com/ssgreg/logftext v1.0.0 h1:GkgGFA8a6gAsG76PUJsxuobHotWg22idDTkFB3rreLc=
+github.com/ssgreg/logftext v1.0.0/go.mod h1:TNf/Vv56/h+wbO6QIqECYvfxhYeXA3wNQK5rtvYLKuI=
+github.com/stretchr/testify v1.2.2 h1:bSDNvY7ZPG5RlJ8otE/7V6gMiyenm9RtJ7IUVIAoJ1w=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
+golang.org/x/sys v0.0.0-20181213081344-73d4af5aa059 h1:dpoPtGwlE4qn2foaFdJVk6ab5yxp7pnyiKlpLgQyMkk=
+golang.org/x/sys v0.0.0-20181213081344-73d4af5aa059/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=

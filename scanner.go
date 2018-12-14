@@ -2,32 +2,61 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
-	"os"
 
 	"github.com/ssgreg/logf"
 	"github.com/ssgreg/logftext"
 )
 
-func scan(r io.Reader, noColor bool) {
+func scan(r io.Reader, w io.Writer, noColor bool, bufferSize uint) error {
 	buf := logf.NewBuffer()
+	scanBuf := make([]byte, bufferSize)
 	eseq := logftext.EscapeSequence{NoColor: noColor}
 
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		e, ok := parse(scanner.Bytes())
-		if !ok {
-			os.Stdout.Write(scanner.Bytes())
-			os.Stdout.Write([]byte{'\n'})
+	lastLineWasTooLong := false
+	for {
+		scanner := bufio.NewScanner(r)
+		scanner.Buffer(scanBuf, len(scanBuf))
 
-			continue
+		for scanner.Scan() {
+			if lastLineWasTooLong {
+				//
+
+				lastLineWasTooLong = false
+				fmt.Println("<line too long>")
+
+				continue
+			}
+
+			e, ok := parse(scanner.Bytes())
+			if !ok {
+				w.Write(scanner.Bytes())
+				w.Write([]byte{'\n'})
+
+				continue
+			}
+
+			adoptEntry(&e)
+			format(buf, eseq, &e)
+
+			w.Write(buf.Bytes())
+			buf.Reset()
 		}
 
-		adoptEntry(&e)
-		format(buf, eseq, &e)
+		switch scanner.Err() {
+		case nil:
+			return nil
 
-		os.Stdout.Write(buf.Bytes())
-		buf.Reset()
+		case bufio.ErrTooLong:
+			// Data does not match to the buffer. As scanner drops the read
+			// data there's nothing we can do about it except setting the flag
+			// to drop the final (next) part of data.
+			lastLineWasTooLong = true
+
+		default:
+			return scanner.Err()
+		}
 	}
 }
 

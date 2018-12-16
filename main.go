@@ -43,7 +43,32 @@ func newCommand() *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		signal.Ignore(os.Interrupt)
 
-		return scan(os.Stdin, os.Stdout, handleColorOption(coloredLogs), handleBufferSize(bufferSize))
+		out := os.Stdout
+		handledNoColor := handleColorOption(coloredLogs)
+		handledBufferSize := handleBufferSize(bufferSize)
+
+		if len(args) == 0 {
+			// No files were specified. Read stdin.
+			return scan(os.Stdin, out, handledNoColor, handledBufferSize)
+		}
+
+		// Scan all specified files.
+		for _, file := range args {
+			f, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			err = scan(f, out, handledNoColor, handledBufferSize)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	return cmd

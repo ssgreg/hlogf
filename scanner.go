@@ -2,17 +2,36 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/ssgreg/logf"
 	"github.com/ssgreg/logftext"
 )
 
-func scan(r io.Reader, w io.Writer, noColor bool, bufferSize uint) error {
-	buf := logf.NewBuffer()
-	scanBuf := make([]byte, bufferSize)
-	eseq := logftext.EscapeSequence{NoColor: noColor}
+// Options holds scan options.
+type Options struct {
+	NoColor        bool
+	BufferSize     uint
+	NumberLines    bool
+	StartingNumber int
+}
+
+func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
+	buf := logf.NewBufferWithCapacity(logf.PageSize * 2)
+	defer func() {
+		w.Write(buf.Bytes())
+	}()
+
+	scanBuf := make([]byte, opts.BufferSize)
+	eseq := logftext.EscapeSequence{NoColor: opts.NoColor}
+
+	// Buffer is enough for 10^32 lines.
+	number := [40]byte{}
+	numberStart := 8
+	for i := range number {
+		number[i] = ' '
+	}
 
 	lastLineWasTooLong := false
 	for {
@@ -20,33 +39,37 @@ func scan(r io.Reader, w io.Writer, noColor bool, bufferSize uint) error {
 		scanner.Buffer(scanBuf, len(scanBuf))
 
 		for scanner.Scan() {
+			if opts.NumberLines {
+				onlyNumber := strconv.AppendInt(number[numberStart:numberStart:len(number)], int64(opts.StartingNumber), 10)
+				window := ((len(onlyNumber)-1)/numberStart + 1) * numberStart
+				padding := numberStart + len(onlyNumber) - window
+				buf.AppendBytes(number[padding : padding+window+1])
+			}
+			opts.StartingNumber++
+
 			if lastLineWasTooLong {
-				//
-
 				lastLineWasTooLong = false
-				fmt.Println("<line too long>")
-
-				continue
+				buf.AppendString("<line too long>\n")
+			} else {
+				e, ok := parse(scanner.Bytes())
+				if !ok {
+					buf.AppendBytes(scanner.Bytes())
+					buf.AppendByte('\n')
+				} else {
+					adoptEntry(&e)
+					format(buf, eseq, &e)
+				}
 			}
 
-			e, ok := parse(scanner.Bytes())
-			if !ok {
-				w.Write(scanner.Bytes())
-				w.Write([]byte{'\n'})
-
-				continue
+			if buf.Len() > logf.PageSize {
+				w.Write(buf.Bytes())
+				buf.Reset()
 			}
-
-			adoptEntry(&e)
-			format(buf, eseq, &e)
-
-			w.Write(buf.Bytes())
-			buf.Reset()
 		}
 
 		switch scanner.Err() {
 		case nil:
-			return nil
+			return opts.StartingNumber, nil
 
 		case bufio.ErrTooLong:
 			// Data does not match to the buffer. As scanner drops the read
@@ -55,7 +78,7 @@ func scan(r io.Reader, w io.Writer, noColor bool, bufferSize uint) error {
 			lastLineWasTooLong = true
 
 		default:
-			return scanner.Err()
+			return opts.StartingNumber, scanner.Err()
 		}
 	}
 }

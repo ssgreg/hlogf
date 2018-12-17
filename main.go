@@ -15,6 +15,11 @@ const (
 	defaultBufferSize = uint(1024 * 10)
 )
 
+var (
+	// Version is specified automatically by goreleaser.
+	version = "dev"
+)
+
 func main() {
 	cmd := newCommand()
 	err := cmd.Execute()
@@ -27,6 +32,7 @@ func main() {
 func newCommand() *cobra.Command {
 	coloredLogs := ""
 	bufferSize := uint(0)
+	numberLines := false
 
 	cmd := &cobra.Command{
 		Use:           "hlogf",
@@ -34,22 +40,32 @@ func newCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.ArbitraryArgs,
+		Version:       version,
+		// DisableFlagsInUseLine: true,
 	}
 
 	flags := cmd.PersistentFlags()
 	flags.StringVar(&coloredLogs, "color", "auto", `Show colored logs ("always"|"never"|"auto"). --color= is the same as --color=always.`)
 	flags.UintVar(&bufferSize, "buffer-size", defaultBufferSize, `Set the read buffer size to buffer-size, in units of KiB (1024 bytes).`)
+	flags.BoolVarP(&numberLines, "number", "n", false, `Number the output lines, starting at 1.`)
+	flags.BoolP("version", "v", false, "Print version information and quit.")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		signal.Ignore(os.Interrupt)
 
 		out := os.Stdout
-		handledNoColor := handleColorOption(coloredLogs)
-		handledBufferSize := handleBufferSize(bufferSize)
+		opts := Options{
+			NoColor:        handleColorOption(coloredLogs),
+			BufferSize:     handleBufferSize(bufferSize),
+			NumberLines:    numberLines,
+			StartingNumber: 1,
+		}
 
 		if len(args) == 0 {
 			// No files were specified. Read stdin.
-			return scan(os.Stdin, out, handledNoColor, handledBufferSize)
+			_, err := scan(os.Stdin, out, opts)
+
+			return err
 		}
 
 		// Scan all specified files.
@@ -62,7 +78,7 @@ func newCommand() *cobra.Command {
 				_ = f.Close()
 			}()
 
-			err = scan(f, out, handledNoColor, handledBufferSize)
+			opts.StartingNumber, err = scan(f, out, opts)
 			if err != nil {
 				return err
 			}

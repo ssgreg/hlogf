@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,6 +14,24 @@ import (
 const (
 	// Default read buffer size, in units of KiB (1024 bytes).
 	defaultBufferSize = uint(1024 * 10)
+
+	description = `Makes json logs possible to read by humans. Supports systemd journal.
+The hlogf reads and parses files sequentally, writing the colored logs to the standard output.
+The 'file' operands are processed in command-line order. If 'file' is a single dash '-' or
+absent, hlogf reads from the standard input.`
+
+	example = `The command:
+
+	hlogf file1
+	
+will parse the content of file1 and print parsed result to the standard output.
+
+The command:
+
+	hlogf file1 file2 > file3
+
+will sequentially parse the content of file1 and file2 and print parsed result to the file3,
+truncating file3 if it already exists.`
 )
 
 var (
@@ -35,13 +54,13 @@ func newCommand() *cobra.Command {
 	numberLines := false
 
 	cmd := &cobra.Command{
-		Use:           "hlogf",
-		Short:         "Makes json logs possible to read by humans. Supports systemd journal.",
+		Use:           "hlogf [flags] [file ...]",
+		Long:          description,
+		Example:       example,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          cobra.ArbitraryArgs,
 		Version:       version,
-		// DisableFlagsInUseLine: true,
 	}
 
 	flags := cmd.PersistentFlags()
@@ -61,16 +80,18 @@ func newCommand() *cobra.Command {
 			StartingNumber: 1,
 		}
 
-		if len(args) == 0 {
-			// No files were specified. Read stdin.
-			_, err := scan(os.Stdin, out, opts)
+		handleReader := func(r io.Reader) error {
+			var err error
+			opts.StartingNumber, err = scan(r, out, opts)
+			if err != nil {
+				return err
+			}
 
-			return err
+			return nil
 		}
 
-		// Scan all specified files.
-		for _, file := range args {
-			f, err := os.Open(file)
+		handleFile := func(name string) error {
+			f, err := os.Open(name)
 			if err != nil {
 				return err
 			}
@@ -78,7 +99,29 @@ func newCommand() *cobra.Command {
 				_ = f.Close()
 			}()
 
-			opts.StartingNumber, err = scan(f, out, opts)
+			return handleReader(f)
+		}
+
+		if len(args) == 0 {
+			// No files were specified. Read stdin.
+			return handleReader(os.Stdin)
+		}
+
+		// Scan all specified files.
+		for _, file := range args {
+			var handle func() error
+			switch file {
+			case "-":
+				handle = func() error {
+					return handleReader(os.Stdin)
+				}
+			default:
+				handle = func() error {
+					return handleFile(file)
+				}
+			}
+
+			err := handle()
 			if err != nil {
 				return err
 			}

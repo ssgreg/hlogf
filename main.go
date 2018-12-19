@@ -14,24 +14,6 @@ import (
 const (
 	// Default read buffer size, in units of KiB (1024 bytes).
 	defaultBufferSize = uint(1024 * 10)
-
-	description = `Makes json logs possible to read by humans. Supports systemd journal.
-The hlogf reads and parses files sequentally, writing the colored logs to the standard output.
-The 'file' operands are processed in command-line order. If 'file' is a single dash '-' or
-absent, hlogf reads from the standard input.`
-
-	example = `The command:
-
-	hlogf file1
-	
-will parse the content of file1 and print parsed result to the standard output.
-
-The command:
-
-	hlogf file1 file2 > file3
-
-will sequentially parse the content of file1 and file2 and print parsed result to the file3,
-truncating file3 if it already exists.`
 )
 
 var (
@@ -40,7 +22,9 @@ var (
 )
 
 func main() {
-	cmd := newCommand()
+	cmd := newRootCommand()
+	cmd.SetHelpTemplate(helpTemplate)
+
 	err := cmd.Execute()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "hlogf failed: %s\n", err.Error())
@@ -48,14 +32,19 @@ func main() {
 	}
 }
 
-func newCommand() *cobra.Command {
-	coloredLogs := ""
-	bufferSize := uint(0)
-	numberLines := false
+type rootOptions struct {
+	coloredLogs string
+	bufferSize  uint
+	numberLines bool
+	files       []string
+}
+
+func newRootCommand() *cobra.Command {
+	var opts rootOptions
 
 	cmd := &cobra.Command{
-		Use:           "hlogf [flags] [file ...]",
-		Long:          description,
+		Use:           "hlogf [OPTIONS] [file ...]",
+		Short:         description,
 		Example:       example,
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -64,73 +53,80 @@ func newCommand() *cobra.Command {
 	}
 
 	flags := cmd.PersistentFlags()
-	flags.StringVar(&coloredLogs, "color", "auto", `Show colored logs ("always"|"never"|"auto"). --color= is the same as --color=always.`)
-	flags.UintVar(&bufferSize, "buffer-size", defaultBufferSize, `Set the read buffer size to buffer-size, in units of KiB (1024 bytes).`)
-	flags.BoolVarP(&numberLines, "number", "n", false, `Number the output lines, starting at 1.`)
-	flags.BoolP("version", "v", false, "Print version information and quit.")
+	flags.StringVar(&opts.coloredLogs, "color", "auto", `Show colored logs ("always"|"never"|"auto"). --color= is the same as --color=always.`)
+	flags.UintVar(&opts.bufferSize, "buffer-size", defaultBufferSize, `Set the read buffer size to buffer-size, in units of KiB (1024 bytes).`)
+	flags.BoolVarP(&opts.numberLines, "number", "n", false, `Number the output lines, starting at 1.`)
+	flags.BoolP("version", "v", false, "Print version information and exit.")
+	flags.BoolP("help", "h", false, "Print this help and exit.")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		signal.Ignore(os.Interrupt)
+		opts.files = args
 
-		out := os.Stdout
-		opts := Options{
-			NoColor:        handleColorOption(coloredLogs),
-			BufferSize:     handleBufferSize(bufferSize),
-			NumberLines:    numberLines,
-			StartingNumber: 1,
-		}
+		return runRoot(opts)
+	}
 
-		handleReader := func(r io.Reader) error {
-			var err error
-			opts.StartingNumber, err = scan(r, out, opts)
-			if err != nil {
-				return err
-			}
+	return cmd
+}
 
-			return nil
-		}
+func runRoot(opts rootOptions) error {
+	signal.Ignore(os.Interrupt)
 
-		handleFile := func(name string) error {
-			f, err := os.Open(name)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = f.Close()
-			}()
+	out := os.Stdout
+	scanOpts := Options{
+		NoColor:        handleColorOption(opts.coloredLogs),
+		BufferSize:     handleBufferSize(opts.bufferSize),
+		NumberLines:    opts.numberLines,
+		StartingNumber: 1,
+	}
 
-			return handleReader(f)
-		}
-
-		if len(args) == 0 {
-			// No files were specified. Read stdin.
-			return handleReader(os.Stdin)
-		}
-
-		// Scan all specified files.
-		for _, file := range args {
-			var handle func() error
-			switch file {
-			case "-":
-				handle = func() error {
-					return handleReader(os.Stdin)
-				}
-			default:
-				handle = func() error {
-					return handleFile(file)
-				}
-			}
-
-			err := handle()
-			if err != nil {
-				return err
-			}
+	handleReader := func(r io.Reader) error {
+		var err error
+		scanOpts.StartingNumber, err = scan(r, out, scanOpts)
+		if err != nil {
+			return err
 		}
 
 		return nil
 	}
 
-	return cmd
+	handleFile := func(name string) error {
+		f, err := os.Open(name)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = f.Close()
+		}()
+
+		return handleReader(f)
+	}
+
+	if len(opts.files) == 0 {
+		// No files were specified. Read stdin.
+		return handleReader(os.Stdin)
+	}
+
+	// Scan all specified files.
+	for _, file := range opts.files {
+		var handle func() error
+		switch file {
+		case "-":
+			handle = func() error {
+				return handleReader(os.Stdin)
+			}
+		default:
+			handle = func() error {
+				return handleFile(file)
+			}
+		}
+
+		err := handle()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // handleColorOption handles 'color' option. It returns true if colored
@@ -159,3 +155,35 @@ func handleColorOption(coloredLogs string) bool {
 func handleBufferSize(bufferSize uint) uint {
 	return bufferSize * 1024
 }
+
+const (
+	description = `
+Makes json logs possible to read by humans. Supports systemd journal.
+
+The hlogf reads and parses files sequentally, writing the colored logs to the standard output.
+The 'file' operands are processed in command-line order. If 'file' is a single dash '-' or
+absent, hlogf reads from the standard input.`
+
+	example = `
+  The command:
+
+  	hlogf file1
+  	
+  will parse the content of file1 and print parsed result to the standard output.
+  
+  The command:
+  
+  	hlogf file1 file2 > file3
+
+  will sequentially parse the content of file1 and file2 and print parsed result to the file3,
+  truncating file3 if it already exists.`
+
+	helpTemplate = `Usage: {{.Use}}
+{{.Short}}
+
+Examples:{{.Example}}
+
+Options:
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}
+`
+)

@@ -102,5 +102,6 @@ func decodeU4(s []byte) rune {
 		r <<= 4
 		r |= rune(v)
 	}
+
 	return r
 }

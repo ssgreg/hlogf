@@ -15,6 +15,7 @@ type Options struct {
 	BufferSize     uint
 	NumberLines    bool
 	StartingNumber int
+	TimeFormat     string
 }
 
 func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
@@ -57,7 +58,7 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 					buf.AppendByte('\n')
 				} else {
 					adoptEntry(&e)
-					format(buf, eseq, &e)
+					format(buf, eseq, &e, opts.TimeFormat)
 				}
 			}
 

@@ -2,15 +2,14 @@ package main
 
 import (
 	"strings"
-	"time"
 
 	"github.com/ssgreg/logf"
 	"github.com/ssgreg/logftext"
 )
 
-func format(buf *logf.Buffer, eseq logftext.EscapeSequence, e *Entry) {
+func format(buf *logf.Buffer, eseq logftext.EscapeSequence, e *Entry, timeFormat string) {
 	// Time.
-	appendTime(buf, eseq, e.Time)
+	appendTime(buf, eseq, e.Time, timeFormat)
 
 	// Level.
 	buf.AppendByte(' ')
@@ -55,14 +54,48 @@ func format(buf *logf.Buffer, eseq logftext.EscapeSequence, e *Entry) {
 	buf.AppendByte('\n')
 }
 
-func appendTime(buf *logf.Buffer, eseq logftext.EscapeSequence, ts []byte) {
+const (
+	badTime       = "bad time"
+	leftBrackets  = "<<"
+	rightBrackets = ">>"
+)
+
+var (
+	templateBadTime = ""
+)
+
+func formatTemplateBadTime(timeFormat string) {
+	totalLen := len(badTime) + len(leftBrackets) + len(rightBrackets)
+	if len(timeFormat) >= totalLen {
+		spaceLen := (len(timeFormat) - totalLen) / 2
+		templateBadTime = leftBrackets
+		for i := 0; i < spaceLen; i++ {
+			templateBadTime += " "
+		}
+		templateBadTime += badTime
+		for i := 0; i < len(timeFormat)-totalLen-spaceLen; i++ {
+			templateBadTime += " "
+		}
+		templateBadTime += rightBrackets
+	} else {
+		for i := 0; i < len(timeFormat); i++ {
+			templateBadTime += "-"
+		}
+	}
+}
+
+func appendTime(buf *logf.Buffer, eseq logftext.EscapeSequence, ts []byte, timeFormat string) {
 	eseq.At(buf, logftext.EscBrightBlack, func() {
 		t, ok := encodeTime(ts)
 		if !ok {
-			buf.AppendString("<<    no time    >>")
+			if templateBadTime == "" {
+				formatTemplateBadTime(timeFormat)
+			}
+			buf.AppendString(templateBadTime)
+
 			return
 		}
-		buf.Data = t.AppendFormat(buf.Data, time.StampMilli)
+		buf.Data = t.AppendFormat(buf.Data, timeFormat)
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/ssgreg/logftext"
@@ -14,6 +15,9 @@ import (
 const (
 	// Default read buffer size, in units of KiB (1024 bytes).
 	defaultBufferSize = uint(1024 * 10)
+
+	// Default time format.
+	defaultTimeFormat = time.StampMilli
 )
 
 var (
@@ -36,6 +40,7 @@ type rootOptions struct {
 	coloredLogs string
 	bufferSize  uint
 	numberLines bool
+	timeFormat  string
 	files       []string
 }
 
@@ -52,7 +57,13 @@ func newRootCommand() *cobra.Command {
 		Version:       version,
 	}
 
+	// TODO: override default values with environment variables.
+	// TODO: query by field set (dont forget about excludes, see grep for details).
+	// TODO: custom field name mapping.
+	// TODO: customize skipping systemd fields.
+
 	flags := cmd.PersistentFlags()
+	flags.StringVarP(&opts.timeFormat, "time-format", "t", defaultTimeFormat, `Set format for 'time' field using golang time format. e.g. "2006-01-02T15:04:05.999999999Z07:00"`)
 	flags.StringVar(&opts.coloredLogs, "color", "auto", `Show colored logs ("always"|"never"|"auto"). --color= is the same as --color=always.`)
 	flags.UintVar(&opts.bufferSize, "buffer-size", defaultBufferSize, `Set the read buffer size to buffer-size, in units of KiB (1024 bytes).`)
 	flags.BoolVarP(&opts.numberLines, "number", "n", false, `Number the output lines, starting at 1.`)
@@ -77,6 +88,7 @@ func runRoot(opts rootOptions) error {
 		BufferSize:     handleBufferSize(opts.bufferSize),
 		NumberLines:    opts.numberLines,
 		StartingNumber: 1,
+		TimeFormat:     opts.timeFormat,
 	}
 
 	handleReader := func(r io.Reader) error {

@@ -57,11 +57,6 @@ func newRootCommand() *cobra.Command {
 		Version:       version,
 	}
 
-	// TODO: override default values with environment variables.
-	// TODO: query by field set (dont forget about excludes, see grep for details).
-	// TODO: custom field name mapping.
-	// TODO: customize skipping systemd fields.
-
 	flags := cmd.PersistentFlags()
 	flags.StringVarP(&opts.timeFormat, "time-format", "t", defaultTimeFormat, `Set format for 'time' field using golang time format. e.g. "2006-01-02T15:04:05.999999999Z07:00"`)
 	flags.StringVar(&opts.coloredLogs, "color", "auto", `Show colored logs ("always"|"never"|"auto"). --color= is the same as --color=always.`)

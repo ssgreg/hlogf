@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"strconv"
+	"sync"
 
 	"github.com/ssgreg/logf"
 	"github.com/ssgreg/logftext"
@@ -19,9 +21,40 @@ type Options struct {
 }
 
 func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
-	buf := logf.NewBufferWithCapacity(logf.PageSize * 2)
-	defer func() {
-		w.Write(buf.Bytes())
+	wg := sync.WaitGroup{}
+	defer wg.Wait()
+
+	ch := make(chan []byte, 1024)
+	defer close(ch)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		bw := bufio.NewWriterSize(w, 1024*1024)
+		defer bw.Flush()
+
+		dirty := false
+		for {
+			if !dirty {
+				data, ok := <-ch
+				if !ok {
+					return
+				}
+				bw.Write(data)
+				dirty = true
+			}
+			select {
+			case data, ok := <-ch:
+				if !ok {
+					return
+				}
+				bw.Write(data)
+			default:
+				bw.Flush()
+				dirty = false
+			}
+		}
 	}()
 
 	scanBuf := make([]byte, opts.BufferSize)
@@ -44,27 +77,23 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 				onlyNumber := strconv.AppendInt(number[numberStart:numberStart:len(number)], int64(opts.StartingNumber), 10)
 				window := ((len(onlyNumber)-1)/numberStart + 1) * numberStart
 				padding := numberStart + len(onlyNumber) - window
-				buf.AppendBytes(number[padding : padding+window+1])
+				ch <- bytes.Repeat(number[padding:padding+window+1], 1)
 			}
 			opts.StartingNumber++
 
 			if lastLineWasTooLong {
 				lastLineWasTooLong = false
-				buf.AppendString("<line too long>\n")
+				ch <- []byte("<line too long>\n")
 			} else {
 				e, ok := parse(scanner.Bytes())
 				if !ok {
-					buf.AppendBytes(scanner.Bytes())
-					buf.AppendByte('\n')
+					ch <- append(bytes.Repeat(scanner.Bytes(), 1), '\n')
 				} else {
 					adoptEntry(&e)
+					buf := logf.NewBufferWithCapacity(logf.PageSize * 2)
 					format(buf, eseq, &e, opts.TimeFormat)
+					ch <- buf.Bytes()
 				}
-			}
-
-			if buf.Len() > logf.PageSize {
-				w.Write(buf.Bytes())
-				buf.Reset()
 			}
 		}
 

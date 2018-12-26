@@ -19,7 +19,7 @@ type Options struct {
 }
 
 func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
-	buf := logf.NewBufferWithCapacity(logf.PageSize * 2)
+	buf := logf.NewBufferWithCapacity(logf.PageSize)
 	defer func() {
 		w.Write(buf.Bytes())
 	}()
@@ -62,10 +62,8 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 				}
 			}
 
-			if buf.Len() > logf.PageSize {
-				w.Write(buf.Bytes())
-				buf.Reset()
-			}
+			w.Write(buf.Bytes())
+			buf.Reset()
 		}
 
 		switch scanner.Err() {

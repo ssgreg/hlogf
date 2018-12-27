@@ -6,3 +6,4 @@
 * TODO: query by field set (dont forget about excludes, see grep for details).
 * TODO: custom field name mapping.
 * TODO: customize skipping systemd fields.
+* TODO: scan with multiple formatter working in parallel

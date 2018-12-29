@@ -19,7 +19,11 @@ func parseTimeInt64(v int64) time.Time {
 	return time.Unix(v/1e9, v%1e9)
 }
 
-func timestampToTime(ts []byte) (time.Time, bool) {
+func ByteSlice2String(bs []byte) string {
+	return *(*string)(unsafe.Pointer(&bs))
+}
+
+func timestampToTime(ts string) (time.Time, bool) {
 	tsI, err := strconv.Atoi(string(ts))
 	if err != nil {
 		return time.Time{}, false
@@ -34,17 +38,19 @@ func encodeTime(ts []byte) (time.Time, bool) {
 	}
 	ts = ts[1 : len(ts)-1]
 
-	t, ok := timestampToTime(ts)
+	tss := ByteSlice2String(ts)
+
+	t, ok := timestampToTime(tss)
 	if ok {
 		return t, true
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, string(ts))
+	t, err := time.Parse(time.RFC3339Nano, tss)
 	if err == nil {
 		return t, true
 	}
 
-	t, err = time.Parse(time.RFC3339, string(ts))
+	t, err = time.Parse(time.RFC3339, tss)
 	if err == nil {
 		return t, true
 	}

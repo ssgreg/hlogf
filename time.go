@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strconv"
 	"time"
 )
 
@@ -19,13 +18,9 @@ func parseTimeInt64(v int64) time.Time {
 	return time.Unix(v/1e9, v%1e9)
 }
 
-func ByteSlice2String(bs []byte) string {
-	return *(*string)(unsafe.Pointer(&bs))
-}
-
 func timestampToTime(ts string) (time.Time, bool) {
-	tsI, err := strconv.Atoi(string(ts))
-	if err != nil {
+	tsI, ok := atoi(ts)
+	if !ok {
 		return time.Time{}, false
 	}
 
@@ -38,7 +33,7 @@ func encodeTime(ts []byte) (time.Time, bool) {
 	}
 	ts = ts[1 : len(ts)-1]
 
-	tss := ByteSlice2String(ts)
+	tss := bytesToString(ts)
 
 	t, ok := timestampToTime(tss)
 	if ok {

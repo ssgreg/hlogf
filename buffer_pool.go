@@ -15,6 +15,11 @@ func NewPool() Pool {
 	}}
 }
 
+// A Pool is a type-safe wrapper around a sync.Pool.
+type Pool struct {
+	p *sync.Pool
+}
+
 // Get retrieves a Buffer from the pool, creating one if necessary.
 func (p Pool) Get() *logf.Buffer {
 	buf := p.p.Get().(*logf.Buffer)

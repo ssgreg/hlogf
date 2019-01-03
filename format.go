@@ -32,6 +32,10 @@ func format(buf *logf.Buffer, eseq logftext.EscapeSequence, e *Entry, timeFormat
 
 	// Fields.
 	for _, f := range e.Fields {
+		if len(f.Key) == 0 {
+			break
+		}
+
 		buf.AppendByte(' ')
 		eseq.At(buf, logftext.EscGreen, func() {
 			buf.AppendString(strings.ToLower(string(f.Key)))

@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"strconv"
 	"sync"
@@ -23,11 +25,15 @@ type Options struct {
 type shot struct {
 	exist  bool
 	number int
-	bytes  []byte
+	buf    *logf.Buffer
 }
 
+var cnt = uint32(0)
+var cntput = uint32(0)
+var cntget = uint32(0)
+
 const (
-	ringBufferCapacity     = 512
+	ringBufferCapacity     = 1024
 	writerChannelCapacity  = 128
 	scannerChannelCapacity = 128
 )
@@ -68,7 +74,7 @@ func (b *ringBuffer) get() (shot, bool) {
 	return shot{}, false
 }
 
-func makeWorker(w io.Writer, opts Options) (chan shot, *sync.WaitGroup) {
+func makeWorker(w io.Writer, p Pool, opts Options) (chan shot, *sync.WaitGroup) {
 	rb := &ringBuffer{}
 
 	slowBuf := make(map[int]shot)
@@ -79,7 +85,7 @@ func makeWorker(w io.Writer, opts Options) (chan shot, *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 
-		bw := bufio.NewWriterSize(w, 1024*1024)
+		bw := bufio.NewWriterSize(w, 4096)
 		defer bw.Flush()
 
 		var data shot
@@ -111,7 +117,8 @@ func makeWorker(w io.Writer, opts Options) (chan shot, *sync.WaitGroup) {
 							bw.Write(number[padding : padding+window+1])
 						}
 
-						bw.Write(s.bytes)
+						bw.Write(s.buf.Bytes())
+						p.Put(s.buf)
 					}
 
 					return
@@ -143,7 +150,8 @@ func makeWorker(w io.Writer, opts Options) (chan shot, *sync.WaitGroup) {
 						bw.Write(number[padding : padding+window+1])
 					}
 
-					bw.Write(s.bytes)
+					bw.Write(s.buf.Bytes())
+					p.Put(s.buf)
 				}
 			}
 		}
@@ -153,39 +161,34 @@ func makeWorker(w io.Writer, opts Options) (chan shot, *sync.WaitGroup) {
 }
 
 type scanEntry struct {
-	number     int
-	needFormat bool
-	data       []byte
+	number int
+	data   []byte
 }
 
-func makeFormatter(us chan scanEntry, ds chan shot, opts Options) *sync.WaitGroup {
+func makeFormatter(us chan scanEntry, ds chan shot, p Pool, opts Options) *sync.WaitGroup {
 	eseq := logftext.EscapeSequence{NoColor: opts.NoColor}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		c := 0
 
 		for se := range us {
-			c++
-			s := shot{true, se.number - 1, se.data}
-			if se.needFormat {
-				e, ok := parse(se.data)
-				if !ok {
-					bt := make([]byte, len(se.data)+1)
-					copy(bt, se.data)
-					bt[len(bt)-1] = '\n'
-					s.bytes = bt
-				} else {
-					buf := logf.NewBufferWithCapacity(1024)
-					adoptEntry(&e)
-					format(buf, eseq, &e, opts.TimeFormat)
-					s.bytes = buf.Bytes()
-				}
+			buf := p.Get() // logf.NewBufferWithCapacity(1024) //p.Get()
+			// buf.AppendBytes(se.data)
+			// buf.AppendByte('\n')
+
+			e, ok := parse(se.data)
+			if !ok {
+				buf.AppendBytes(se.data)
+				buf.AppendByte('\n')
+			} else {
+				adoptEntry(&e)
+				format(buf, eseq, &e, opts.TimeFormat)
 			}
 
-			ds <- s
+			// p.Put(buf)
+			ds <- shot{true, se.number - 1, buf}
 		}
 	}()
 
@@ -197,13 +200,15 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 
 	usCh := make(chan scanEntry, scannerChannelCapacity)
 
-	ch, wg := makeWorker(w, opts)
+	p := NewPool()
+
+	ch, wg := makeWorker(w, p, opts)
 	defer wg.Wait()
 	defer close(ch)
 
 	wgs := make([]*sync.WaitGroup, runtime.NumCPU())
 	for i := 0; i < len(wgs); i++ {
-		wgs[i] = makeFormatter(usCh, ch, opts)
+		wgs[i] = makeFormatter(usCh, ch, p, opts)
 	}
 	defer func() {
 		close(usCh)
@@ -226,7 +231,6 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 				lastLineWasTooLong = false
 				se.data = []byte("<line too long>\n")
 			} else {
-				se.needFormat = true
 				se.data = scanner.Bytes()
 			}
 
@@ -235,6 +239,7 @@ func scan(r io.Reader, w io.Writer, opts Options) (int, error) {
 
 		switch scanner.Err() {
 		case nil:
+			fmt.Fprintln(os.Stderr, "----------------------------", cnt, cntget, cntput, opts.StartingNumber)
 			return opts.StartingNumber, nil
 
 		case bufio.ErrTooLong:
@@ -264,7 +269,7 @@ type Entry struct {
 	Name     []byte
 	Caller   []byte
 	Priority []byte
-	Fields   []Field
+	Fields   [10]Field
 }
 
 func parse(data []byte) (Entry, bool) {
@@ -276,6 +281,8 @@ func parse(data []byte) (Entry, bool) {
 		return t, false
 	}
 	data = data[1 : len(data)-1]
+
+	fieldCount := 0
 
 	for idx := 0; idx < len(data); {
 		key, length, ok := fetchKey(data[idx:])
@@ -296,7 +303,9 @@ func parse(data []byte) (Entry, bool) {
 				t.Level = val
 			} else {
 				if key[0] != '_' {
-					t.Fields = append(t.Fields, Field{key, val})
+					// t.Fields = append(t.Fields, Field{key, val})
+					t.Fields[fieldCount] = Field{key, val}
+					fieldCount++
 				}
 			}
 		case "ts", "TS", "time", "TIME":
@@ -316,7 +325,9 @@ func parse(data []byte) (Entry, bool) {
 		case "SYSLOG_FACILITY", "SYSLOG_IDENTIFIER":
 		default:
 			if key[0] != '_' {
-				t.Fields = append(t.Fields, Field{key, val})
+				// t.Fields = append(t.Fields, Field{key, val})
+				t.Fields[fieldCount] = Field{key, val}
+				fieldCount++
 			}
 		}
 	}

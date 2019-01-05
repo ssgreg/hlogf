@@ -7,3 +7,4 @@
 * TODO: custom field name mapping.
 * TODO: customize skipping systemd fields.
 * TODO: scan with multiple formatter working in parallel
+* TODO: fix max 20 static fields

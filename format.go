@@ -38,7 +38,9 @@ func format(buf *logf.Buffer, eseq logftext.EscapeSequence, e *Entry, timeFormat
 
 		buf.AppendByte(' ')
 		eseq.At(buf, logftext.EscGreen, func() {
-			buf.AppendString(strings.ToLower(string(f.Key)))
+			key := strings.ToLower(string(f.Key))
+			key = strings.Replace(key, "_", "-", -1)
+			buf.AppendString(key)
 		})
 		eseq.At(buf, logftext.EscBrightBlack, func() {
 			buf.AppendByte('=')
